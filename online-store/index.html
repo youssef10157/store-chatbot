@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Store - مساعد المتجر</title>
+  <style>
+    :root { color-scheme: light; font-family: "Segoe UI", Tahoma, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: #eef4ff; color: #172033; }
+    .app { width: min(920px, 100%); margin: auto; padding: 24px 14px; }
+    header { background: linear-gradient(135deg, #155eef, #188038); color: white; border-radius: 20px; padding: 24px; }
+    header h1 { margin: 0 0 4px; }
+    header p { margin: 0; opacity: .9; }
+    .chat { background: white; border-radius: 20px; margin-top: 16px; padding: 16px; box-shadow: 0 10px 30px #17203318; }
+    #messages { min-height: 360px; max-height: 55vh; overflow-y: auto; padding: 6px; }
+    .message { margin: 10px 0; white-space: pre-line; line-height: 1.7; }
+    .message.user { color: #155eef; }
+    .message.bot { color: #188038; }
+    .composer { display: flex; gap: 8px; border-top: 1px solid #e5e7eb; padding-top: 14px; }
+    input { flex: 1; border: 1px solid #cbd5e1; border-radius: 12px; padding: 12px; font-size: 16px; text-align: right; }
+    button { border: 0; border-radius: 12px; padding: 0 20px; background: #155eef; color: white; font-size: 16px; cursor: pointer; }
+    button:hover { background: #0f4dcc; }
+    .hint { color: #667085; font-size: 14px; margin: 12px 0 0; }
+    @media (max-width: 520px) { .composer { flex-direction: column; } button { min-height: 44px; } }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <h1>Store</h1>
+      <p>مساعد المتجر أونلاين</p>
+    </header>
+    <section class="chat" aria-label="محادثة Store">
+      <div id="messages"></div>
+      <div class="composer">
+        <input id="message" autocomplete="off" placeholder="اكتب رسالتك هنا..." aria-label="رسالتك">
+        <button id="send" type="button">إرسال</button>
+      </div>
+      <p class="hint">جرّب: المنتجات، سعر حذاء رياضي، اضف حذاء رياضي، السلة، مساعدة</p>
+    </section>
+  </main>
+  <script>
+    const products = {
+      "قميص قطن": { price: 350, stock: 12 },
+      "بنطلون جينز": { price: 600, stock: 7 },
+      "حذاء رياضي": { price: 900, stock: 5 },
+      "حقيبة يومية": { price: 450, stock: 9 }
+    };
+    const cart = {};
+    const messages = document.querySelector("#messages");
+    const input = document.querySelector("#message");
+
+    const money = value => `${value} جنيه`;
+    const addMessage = (who, text) => {
+      const item = document.createElement("div");
+      item.className = `message ${who}`;
+      item.textContent = `${who === "user" ? "أنت" : "Store"}: ${text}`;
+      messages.appendChild(item);
+      messages.scrollTop = messages.scrollHeight;
+    };
+    const catalog = () => Object.entries(products)
+      .map(([name, item]) => `- ${name}: ${money(item.price)} (المتاح ${item.stock})`).join("\n");
+    const cartSummary = () => {
+      const items = Object.entries(cart);
+      if (!items.length) return "السلة فارغة.";
+      let total = 0;
+      const lines = items.map(([name, quantity]) => {
+        const subtotal = products[name].price * quantity;
+        total += subtotal;
+        return `- ${name} × ${quantity} = ${money(subtotal)}`;
+      });
+      return `محتويات السلة:\n${lines.join("\n")}\nالإجمالي: ${money(total)}`;
+    };
+    const findProduct = text => Object.keys(products).find(name => text.includes(name));
+    const reply = raw => {
+      const text = raw.trim().toLowerCase();
+      if (!text) return "اكتب سؤالك أو اكتب «مساعدة».";
+      if (text.includes("مساعدة") || text.includes("أوامر")) {
+        return "أقدر أساعدك في:\n- المنتجات: عرض الكتالوج.\n- سعر حذاء رياضي: البحث عن السعر.\n- اضف حذاء رياضي: إضافة منتج للسلة.\n- السلة: مراجعة الطلب.";
+      }
+      if (text.includes("المنتجات") || text.includes("الكتالوج")) return `المنتجات المتاحة:\n${catalog()}`;
+      if (text.includes("السلة")) return cartSummary();
+      if (text.includes("مواعيد") || text.includes("مفتوح")) return "مواعيدنا من 10 صباحًا لحد 10 مساءً، والتوصيل داخل القاهرة خلال 24 ساعة.";
+      const product = findProduct(text);
+      if (product) {
+        if (text.includes("اضف") || text.includes("اشتري") || text.includes("طلب")) {
+          const available = products[product].stock - (cart[product] || 0);
+          if (available < 1) return `المنتج ${product} غير متاح حاليًا.`;
+          cart[product] = (cart[product] || 0) + 1;
+          return `تمت إضافة ${product} للسلة.\n${cartSummary()}`;
+        }
+        return `${product}: السعر ${money(products[product].price)}، والمتاح ${products[product].stock}.`;
+      }
+      if (text.includes("السلام") || text.includes("اهلا") || text.includes("أهلا")) return "أهلاً بيك! أنا مساعد Store. اكتب «مساعدة» لمعرفة الأوامر.";
+      return "مش لاقي المطلوب. جرّب «المنتجات» أو «مساعدة».";
+    };
+    const send = () => {
+      const value = input.value.trim();
+      if (!value) return;
+      addMessage("user", value);
+      addMessage("bot", reply(value));
+      input.value = "";
+      input.focus();
+    };
+    document.querySelector("#send").addEventListener("click", send);
+    input.addEventListener("keydown", event => { if (event.key === "Enter") send(); });
+    addMessage("bot", "أهلاً بيك! أنا مساعد Store أونلاين. اكتب «مساعدة» للبدء.");
+  </script>
+</body>
+</html>
